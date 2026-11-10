@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FFmpeg Video Merger Studio</title>
+    <title>Video Merger Studio</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -90,9 +90,10 @@
                     </h2>
                     <span id="videoCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">0 Video</span>
                 </div>
-                <button onclick="clearAllVideos()" id="clearBtn" class="text-xs text-rose-400 hover:text-rose-300 font-medium flex items-center space-x-1.5 hidden bg-rose-500/10 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg border border-rose-500/20 transition-colors">
-                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                    <span>Hapus Semua</span>
+                <!-- Tombol Refresh Halaman -->
+                <button onclick="refreshPage()" class="text-xs text-slate-300 hover:text-white font-medium flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition-colors">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-indigo-400"></i>
+                    <span>Refresh Halaman</span>
                 </button>
             </div>
 
@@ -104,7 +105,7 @@
                         <i data-lucide="film" class="w-6 h-6"></i>
                     </div>
                     <p class="text-slate-300 text-sm font-medium">Belum ada file video yang diunggah.</p>
-                    <p class="text-slate-500 text-xs mt-1">Tambahkan beberapa video di atas untuk mulai mengatur urutan.</p>
+                    <p class="text-slate-500 text-xs mt-1">Tambahkan beberapa video di atas untuk mulai memproses.</p>
                 </div>
             </div>
 
@@ -271,19 +272,25 @@
     </div>
 
     <!-- Hidden Video Player Element for Canvas Capture -->
-    <video id="hiddenVideoPlayer" class="hidden" playsinline muted></video>
+    <video id="hiddenVideoPlayer" class="hidden" playsinline muted crossorigin="anonymous"></video>
 
     <!-- Script Logic -->
     <script>
         let videoFiles = [];
         let currentAspect = '16:9';
         let isRendering = false;
-        let draggedItemIndex = null;
+        let audioCtx = null;
+        let sourceNode = null;
+        let audioDestination = null;
 
         window.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             setupDragAndDrop();
         });
+
+        function refreshPage() {
+            window.location.reload();
+        }
 
         function setTargetAspect(aspect) {
             currentAspect = aspect;
@@ -366,14 +373,12 @@
             const listContainer = document.getElementById('videoList');
             const emptyState = document.getElementById('emptyState');
             const countBadge = document.getElementById('videoCountBadge');
-            const clearBtn = document.getElementById('clearBtn');
             const startMergeBtn = document.getElementById('startMergeBtn');
 
             countBadge.innerText = `${videoFiles.length} Video`;
 
             if (videoFiles.length === 0) {
                 emptyState.classList.remove('hidden');
-                clearBtn.classList.add('hidden');
                 startMergeBtn.disabled = true;
                 listContainer.innerHTML = '';
                 listContainer.appendChild(emptyState);
@@ -381,27 +386,13 @@
             }
 
             emptyState.classList.add('hidden');
-            clearBtn.classList.remove('hidden');
             if (!isRendering) startMergeBtn.disabled = false;
 
             let html = '';
             videoFiles.forEach((item, index) => {
                 html += `
-                    <div 
-                        draggable="${!isRendering}" 
-                        ondragstart="handleDragStart(event, ${index})" 
-                        ondragover="handleDragOver(event, ${index})" 
-                        ondragend="handleDragEnd(event)"
-                        ondrop="handleDrop(event, ${index})"
-                        class="video-card-item flex items-center justify-between p-3 bg-slate-900/90 border border-slate-800 rounded-xl hover:border-slate-700 transition-all group cursor-grab active:cursor-grabbing hover:bg-slate-900"
-                        data-index="${index}"
-                    >
+                    <div class="video-card-item flex items-center justify-between p-3 bg-slate-900/90 border border-slate-800 rounded-xl hover:bg-slate-900 transition-all">
                         <div class="flex items-center space-x-3 min-w-0">
-                            <!-- Drag Handle -->
-                            <div class="text-slate-600 group-hover:text-slate-400 cursor-grab flex items-center justify-center">
-                                <i data-lucide="grip-vertical" class="w-4 h-4"></i>
-                            </div>
-
                             <!-- Thumbnail -->
                             <div class="w-16 h-10 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 relative group/thumb">
                                 <video src="${item.url}" class="w-full h-full object-cover"></video>
@@ -414,7 +405,7 @@
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">#${index + 1}</span>
-                                    <p class="text-xs font-bold text-white truncate max-w-[160px] sm:max-w-xs">${item.name}</p>
+                                    <p class="text-xs font-bold text-white truncate max-w-[200px] sm:max-w-xs">${item.name}</p>
                                 </div>
                                 <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
                                     <span>${item.size}</span>
@@ -423,77 +414,12 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Actions -->
-                        <div class="flex items-center space-x-1 flex-shrink-0">
-                            <button onclick="moveVideo(${index}, -1)" ${index === 0 || isRendering ? 'disabled' : ''} class="p-1.5 text-slate-400 hover:text-white disabled:text-slate-800 hover:bg-slate-800 rounded-lg transition-colors" title="Pindah Atas">
-                                <i data-lucide="chevron-up" class="w-4 h-4"></i>
-                            </button>
-                            <button onclick="moveVideo(${index}, 1)" ${index === videoFiles.length - 1 || isRendering ? 'disabled' : ''} class="p-1.5 text-slate-400 hover:text-white disabled:text-slate-800 hover:bg-slate-800 rounded-lg transition-colors" title="Pindah Bawah">
-                                <i data-lucide="chevron-down" class="w-4 h-4"></i>
-                            </button>
-                            <button onclick="removeVideo('${item.id}')" ${isRendering ? 'disabled' : ''} class="p-1.5 text-rose-400 hover:text-rose-300 disabled:text-slate-800 hover:bg-rose-500/10 rounded-lg transition-colors ml-1" title="Hapus">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
                     </div>
                 `;
             });
 
             listContainer.innerHTML = html;
             lucide.createIcons();
-        }
-
-        // --- DRAG & DROP REORDERING HANDLERS ---
-        function handleDragStart(e, index) {
-            if (isRendering) return;
-            draggedItemIndex = index;
-            e.dataTransfer.effectAllowed = 'move';
-            e.currentTarget.classList.add('opacity-40', 'border-indigo-500');
-        }
-
-        function handleDragOver(e, index) {
-            e.preventDefault();
-            if (isRendering || draggedItemIndex === null || draggedItemIndex === index) return;
-            e.dataTransfer.dropEffect = 'move';
-        }
-
-        function handleDrop(e, targetIndex) {
-            e.preventDefault();
-            if (isRendering || draggedItemIndex === null || draggedItemIndex === targetIndex) return;
-
-            const movedItem = videoFiles.splice(draggedItemIndex, 1)[0];
-            videoFiles.splice(targetIndex, 0, movedItem);
-
-            draggedItemIndex = null;
-            renderVideoList();
-        }
-
-        function handleDragEnd(e) {
-            draggedItemIndex = null;
-            renderVideoList();
-        }
-
-        function moveVideo(index, direction) {
-            if (isRendering) return;
-            const newIndex = index + direction;
-            if (newIndex < 0 || newIndex >= videoFiles.length) return;
-            const temp = videoFiles[index];
-            videoFiles[index] = videoFiles[newIndex];
-            videoFiles[newIndex] = temp;
-            renderVideoList();
-        }
-
-        function removeVideo(id) {
-            if (isRendering) return;
-            videoFiles = videoFiles.filter(item => item.id !== id);
-            renderVideoList();
-        }
-
-        function clearAllVideos() {
-            if (isRendering) return;
-            videoFiles = [];
-            renderVideoList();
         }
 
         // --- DIRECT CANVAS & MEDIARECORDER MERGING ENGINE ---
@@ -516,23 +442,20 @@
             const strategy = document.querySelector('input[name="aspectStrategy"]:checked').value;
             const videoElem = document.getElementById('hiddenVideoPlayer');
 
-            // Setup Audio Synthesizer & Canvas Stream Capture
-            const canvasStream = canvas.captureStream(30);
-            
-            // Audio context setup for video audio routing
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const audioDestination = audioCtx.createMediaStreamDestination();
-            const sourceNode = audioCtx.createMediaElementSource(videoElem);
-            sourceNode.connect(audioDestination);
-            sourceNode.connect(audioCtx.destination); // For real-time listening if unmuted
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                audioDestination = audioCtx.createMediaStreamDestination();
+                sourceNode = audioCtx.createMediaElementSource(videoElem);
+                sourceNode.connect(audioDestination);
+                sourceNode.connect(audioCtx.destination);
+            }
 
-            // Combine audio track into captured canvas stream
+            const canvasStream = canvas.captureStream(30);
             const combinedStream = new MediaStream([
                 ...canvasStream.getVideoTracks(),
                 ...audioDestination.stream.getAudioTracks()
             ]);
 
-            // Select MediaRecorder MIME type
             let mimeType = 'video/webm;codecs=vp9,opus';
             if (!MediaRecorder.isTypeSupported(mimeType)) {
                 mimeType = 'video/webm';
@@ -547,11 +470,9 @@
 
             recorder.start();
 
-            // Calculate total duration for progress
             const totalDurationSec = videoFiles.reduce((acc, v) => acc + (v.durationSec || 0), 0);
             let processedSec = 0;
 
-            // Sequential video rendering loop
             for (let i = 0; i < videoFiles.length; i++) {
                 const item = videoFiles[i];
                 document.getElementById('renderStatusText').innerText = `Memproses Video #${i + 1}: ${item.name}`;
@@ -573,20 +494,17 @@
                             return;
                         }
 
-                        // Draw background & frame scaling strategy
                         ctx.clearRect(0, 0, targetW, targetH);
 
                         const vw = videoElem.videoWidth;
                         const vh = videoElem.videoHeight;
 
                         if (strategy === 'blur') {
-                            // Draw blurred background stretch
                             ctx.save();
                             ctx.filter = 'blur(30px) brightness(0.6)';
                             ctx.drawImage(videoElem, 0, 0, targetW, targetH);
                             ctx.restore();
 
-                            // Draw letterboxed original video over blurred background
                             const scale = Math.min(targetW / vw, targetH / vh);
                             const dw = vw * scale;
                             const dh = vh * scale;
@@ -614,7 +532,6 @@
                             ctx.drawImage(videoElem, dx, dy, dw, dh);
                         }
 
-                        // Update progress bar
                         const currentVideoProgress = videoElem.currentTime;
                         const totalProgress = Math.min(100, Math.round(((processedSec + currentVideoProgress) / (totalDurationSec || 1)) * 100));
                         document.getElementById('renderPercent').innerText = `${totalProgress}%`;
@@ -629,15 +546,14 @@
                 processedSec += item.durationSec || 0;
             }
 
-            // Stop Recorder and save file
             recorder.stop();
             document.getElementById('renderStatusText').innerText = 'Menyelesaikan & Mengunduh File...';
 
             recorder.onstop = () => {
-                const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
                 const downloadUrl = URL.createObjectURL(blob);
-                const userFilename = document.getElementById('outputFilename').value.trim() || 'gabungan_video.mp4';
-                const finalFilename = userFilename.endsWith('.mp4') || userFilename.endsWith('.webm') ? userFilename : `${userFilename}.mp4`;
+                const userFilename = document.getElementById('outputFilename').value.trim() || 'gabungan_video.webm';
+                const finalFilename = userFilename.endsWith('.webm') || userFilename.endsWith('.mp4') ? userFilename : `${userFilename}.webm`;
 
                 const a = document.createElement('a');
                 a.href = downloadUrl;
@@ -647,7 +563,6 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(downloadUrl);
 
-                // Reset Engine State
                 isRendering = false;
                 document.getElementById('renderProgressContainer').classList.add('hidden');
                 document.getElementById('canvasPlaceholder').classList.remove('hidden');
@@ -673,5 +588,26 @@
             document.getElementById(modalId).classList.add('hidden');
         }
     </script>
+
+</script>
+
+<!-- 1. Script Modal Popup & Floating -->
+    <script src="https://raw.githack.com/buanamedia/qris/main/qris-popup.js?v=300"></script>
+    <script src="https://raw.githack.com/buanamedia/qris/main/qris-floating.js?v=300"></script>
+
+    <!-- 2. Script Banner Firebase Realtime (Wajib type="module") -->
+    <script type="module" src="https://raw.githack.com/buanamedia/qris/main/qris-banner.js?v=300"></script>
+
+    <!-- Pemicu Otomatis Buka Modal -->
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (typeof window.openQrisModal === 'function') {
+                    window.openQrisModal();
+                }
+            }, 300);
+        });
+    </script>
+
 </body>
 </html>
