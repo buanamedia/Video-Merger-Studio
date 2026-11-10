@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFmpeg Video Merger Studio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f3ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#1e1b4b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        code, pre { font-family: 'Fira Code', monospace; }
+        .drag-over { border-color: #6366f1 !important; background-color: rgba(99, 102, 241, 0.08); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 9999px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-xl text-white shadow-lg shadow-indigo-500/25">
+                    <i data-lucide="video" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                        Video Merger Studio <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Client-Side Engine</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Penggabung Video Direct Render (by Buanamedia)</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openModal('guideModal')" class="flex items-center space-x-1.5 text-xs font-medium px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700/80 hover:border-slate-600">
+                    <i data-lucide="book-open" class="w-4 h-4 text-indigo-400"></i>
+                    <span class="hidden sm:inline">Cara Kerja</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Column: Video List & Upload (7 Cols) -->
+        <div class="lg:col-span-7 space-y-6">
+            
+            <!-- Upload Zone -->
+            <div id="dropZone" class="border-2 border-dashed border-slate-700/80 hover:border-indigo-500 rounded-2xl p-6 sm:p-8 text-center cursor-pointer hover:bg-indigo-500/5 transition-all bg-slate-900/30 relative group">
+                <input type="file" id="fileInput" multiple accept="video/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                <div class="w-14 h-14 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto mb-3 group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all border border-indigo-500/20">
+                    <i data-lucide="upload-cloud" class="w-7 h-7"></i>
+                </div>
+                <h3 class="text-base font-bold text-white mb-1">Seret & Taruh File Video ke Sini</h3>
+                <p class="text-xs text-slate-400 mb-4">Mendukung file MP4, WebM, MOV (Bisa campuran 16:9 & 9:16)</p>
+                <span class="inline-flex items-center px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all shadow-md shadow-indigo-600/30">
+                    <i data-lucide="plus" class="w-4 h-4 mr-1.5"></i> Pilih File Video
+                </span>
+            </div>
+
+            <!-- Video List Header -->
+            <div class="flex items-center justify-between pt-2">
+                <div class="flex items-center space-x-2">
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <span>Daftar Antrean Video</span>
+                    </h2>
+                    <span id="videoCountBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">0 Video</span>
+                </div>
+                <button onclick="clearAllVideos()" id="clearBtn" class="text-xs text-rose-400 hover:text-rose-300 font-medium flex items-center space-x-1.5 hidden bg-rose-500/10 hover:bg-rose-500/20 px-3 py-1.5 rounded-lg border border-rose-500/20 transition-colors">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    <span>Hapus Semua</span>
+                </button>
+            </div>
+
+            <!-- Video Cards Items Container -->
+            <div id="videoList" class="space-y-3 min-h-[160px] custom-scrollbar max-h-[500px] overflow-y-auto pr-1">
+                <!-- Empty State -->
+                <div id="emptyState" class="border border-slate-800 rounded-2xl p-10 text-center bg-slate-900/20">
+                    <div class="w-12 h-12 bg-slate-800/60 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-500">
+                        <i data-lucide="film" class="w-6 h-6"></i>
+                    </div>
+                    <p class="text-slate-300 text-sm font-medium">Belum ada file video yang diunggah.</p>
+                    <p class="text-slate-500 text-xs mt-1">Tambahkan beberapa video di atas untuk mulai mengatur urutan.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Settings & Direct Rendering Engine (5 Cols) -->
+        <div class="lg:col-span-5 space-y-6">
+            
+            <!-- Controls Form Card -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                <h3 class="text-sm font-bold text-white flex items-center space-x-2 border-b border-slate-800 pb-3">
+                    <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+                    <span>Pengaturan Video Output</span>
+                </h3>
+
+                <!-- Target Aspect Ratio -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Target Aspek Rasio</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="setTargetAspect('16:9')" id="btnAspect169" class="ratio-btn active border px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border-indigo-500 bg-indigo-600/20 text-indigo-300">
+                            <i data-lucide="monitor" class="w-4 h-4"></i>
+                            <span>16:9 (1920x1080)</span>
+                        </button>
+                        <button type="button" onclick="setTargetAspect('9:16')" id="btnAspect916" class="ratio-btn border border-slate-700 bg-slate-800/40 hover:bg-slate-800 text-slate-400 px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
+                            <i data-lucide="smartphone" class="w-4 h-4"></i>
+                            <span>9:16 (1080x1920)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Aspect Strategy Option -->
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Metode Penyesuaian Fit Mode</label>
+                    <div class="space-y-2">
+                        <label class="flex items-start p-3 rounded-xl border border-slate-800 bg-slate-950/40 cursor-pointer hover:border-indigo-500/50 transition-colors">
+                            <input type="radio" name="aspectStrategy" value="blur" checked class="mt-1 text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700">
+                            <div class="ml-3">
+                                <span class="text-xs font-bold text-white block">Blur Background (Rekomendasi)</span>
+                                <span class="text-[11px] text-slate-400">Memberikan latar belakang blur jika aspek rasio video berbeda.</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-3 rounded-xl border border-slate-800 bg-slate-950/40 cursor-pointer hover:border-indigo-500/50 transition-colors">
+                            <input type="radio" name="aspectStrategy" value="pad_black" class="mt-1 text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700">
+                            <div class="ml-3">
+                                <span class="text-xs font-bold text-white block">Pad / Letterbox (Bar Hitam)</span>
+                                <span class="text-[11px] text-slate-400">Menambahkan baris hitam di sisi kosong tanpa memotong isi video.</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start p-3 rounded-xl border border-slate-800 bg-slate-950/40 cursor-pointer hover:border-indigo-500/50 transition-colors">
+                            <input type="radio" name="aspectStrategy" value="crop" class="mt-1 text-indigo-600 focus:ring-indigo-500 bg-slate-900 border-slate-700">
+                            <div class="ml-3">
+                                <span class="text-xs font-bold text-white block">Crop / Fill (Isi Penuh Layar)</span>
+                                <span class="text-[11px] text-slate-400">Memotong bagian tepi video agar tepat memenuhi aspek rasio target.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Output File Name -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Nama File Output</label>
+                    <input type="text" id="outputFilename" value="gabungan_video.mp4" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono">
+                </div>
+
+                <!-- Render Progress Bar -->
+                <div id="renderProgressContainer" class="hidden space-y-2 pt-2">
+                    <div class="flex justify-between text-xs font-semibold">
+                        <span class="text-indigo-400 flex items-center gap-1.5">
+                            <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
+                            <span id="renderStatusText">Memproses Render Canvas...</span>
+                        </span>
+                        <span id="renderPercent" class="text-white">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                        <div id="renderProgressBar" class="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full w-0 transition-all duration-150"></div>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="pt-2">
+                    <button onclick="startMerging()" id="startMergeBtn" disabled class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-600 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center space-x-2">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        <span>Gabung & Download Video</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Render Box (Hidden Processing Canvas & Visualiser) -->
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="tv" class="w-3.5 h-3.5 text-indigo-400"></i> Live Canvas Processor
+                    </span>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
+                    <canvas id="renderCanvas" class="w-full h-full object-contain"></canvas>
+                    <div id="canvasPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 bg-slate-950">
+                        <i data-lucide="clapperboard" class="w-8 h-8 mb-2"></i>
+                        <span class="text-xs font-medium">Pratinjau render canvas akan tampil di sini</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+        <p>Video Merger Studio &bull; Diproses 100% Client-Side</p>
+    </footer>
+
+    <!-- Guide Modal -->
+    <div id="guideModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-indigo-400"></i>
+                    <span>Cara Kerja Direct In-Browser Merger</span>
+                </h3>
+                <button onclick="closeModal('guideModal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 text-xs text-slate-300 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <div class="flex items-start space-x-3">
+                    <span class="w-6 h-6 bg-indigo-600 rounded-lg text-white font-bold flex items-center justify-center text-xs flex-shrink-0">1</span>
+                    <div>
+                        <h4 class="font-bold text-white text-xs">Tanpa Eksternal App / Install FFmpeg</h4>
+                        <p class="text-slate-400 mt-0.5">Aplikasi ini memproses dan menggabungkan video secara virtual menggunakan <b>HTML5 Canvas Engine</b> dan merekamnya langsung dengan <b>MediaRecorder API</b> bawaan web browser.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start space-x-3">
+                    <span class="w-6 h-6 bg-indigo-600 rounded-lg text-white font-bold flex items-center justify-center text-xs flex-shrink-0">2</span>
+                    <div>
+                        <h4 class="font-bold text-white text-xs">Penyesuaian Rasio Otomatis</h4>
+                        <p class="text-slate-400 mt-0.5">Setiap video antrean akan diproyeksikan ke resolusi target (1920x1080 atau 1080x1920) dengan pilihan efek Blur, Pad, atau Crop yang membuat penggabungan 16:9 dan 9:16 tetap rapi.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start space-x-3">
+                    <span class="w-6 h-6 bg-indigo-600 rounded-lg text-white font-bold flex items-center justify-center text-xs flex-shrink-0">3</span>
+                    <div>
+                        <h4 class="font-bold text-white text-xs">Langsung Download File Video</h4>
+                        <p class="text-slate-400 mt-0.5">Setelah proses rendering selesai 100%, file hasil gabungan video akan langsung diunduh secara otomatis ke folder Download komputer Anda.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-800 flex justify-end">
+                <button onclick="closeModal('guideModal')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition-colors">
+                    Mengerti
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transform translate-y-20 opacity-0 transition-all duration-300">
+        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
+        <span id="toastMessage" class="text-xs font-medium">Notifikasi</span>
+    </div>
+
+    <!-- Hidden Video Player Element for Canvas Capture -->
+    <video id="hiddenVideoPlayer" class="hidden" playsinline muted></video>
+
+    <!-- Script Logic -->
+    <script>
+        let videoFiles = [];
+        let currentAspect = '16:9';
+        let isRendering = false;
+        let draggedItemIndex = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            setupDragAndDrop();
+        });
+
+        function setTargetAspect(aspect) {
+            currentAspect = aspect;
+            const btn169 = document.getElementById('btnAspect169');
+            const btn916 = document.getElementById('btnAspect916');
+
+            if (aspect === '16:9') {
+                btn169.className = "ratio-btn active border px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border-indigo-500 bg-indigo-600/20 text-indigo-300";
+                btn916.className = "ratio-btn border border-slate-700 bg-slate-800/40 hover:bg-slate-800 text-slate-400 px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2";
+            } else {
+                btn916.className = "ratio-btn active border px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border-indigo-500 bg-indigo-600/20 text-indigo-300";
+                btn169.className = "ratio-btn border border-slate-700 bg-slate-800/40 hover:bg-slate-800 text-slate-400 px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2";
+            }
+        }
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+
+            ['dragenter', 'dragover'].forEach(name => {
+                dropZone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('drag-over');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(name => {
+                dropZone.addEventListener(name, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('drag-over');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                handleFiles(e.dataTransfer.files);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+                fileInput.value = '';
+            });
+        }
+
+        function handleFiles(files) {
+            if (isRendering) return;
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.type.startsWith('video/')) {
+                    const videoObj = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        file: file,
+                        name: file.name,
+                        size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+                        url: URL.createObjectURL(file),
+                        durationSec: 0,
+                        durationText: 'Loading...'
+                    };
+                    videoFiles.push(videoObj);
+                    loadVideoMetadata(videoObj);
+                }
+            }
+            renderVideoList();
+        }
+
+        function loadVideoMetadata(videoObj) {
+            const tempVid = document.createElement('video');
+            tempVid.preload = 'metadata';
+            tempVid.src = videoObj.url;
+            tempVid.onloadedmetadata = () => {
+                videoObj.durationSec = tempVid.duration;
+                const totalSeconds = Math.round(tempVid.duration);
+                const mins = Math.floor(totalSeconds / 60);
+                const secs = totalSeconds % 60;
+                videoObj.durationText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                renderVideoList();
+            };
+        }
+
+        function renderVideoList() {
+            const listContainer = document.getElementById('videoList');
+            const emptyState = document.getElementById('emptyState');
+            const countBadge = document.getElementById('videoCountBadge');
+            const clearBtn = document.getElementById('clearBtn');
+            const startMergeBtn = document.getElementById('startMergeBtn');
+
+            countBadge.innerText = `${videoFiles.length} Video`;
+
+            if (videoFiles.length === 0) {
+                emptyState.classList.remove('hidden');
+                clearBtn.classList.add('hidden');
+                startMergeBtn.disabled = true;
+                listContainer.innerHTML = '';
+                listContainer.appendChild(emptyState);
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            clearBtn.classList.remove('hidden');
+            if (!isRendering) startMergeBtn.disabled = false;
+
+            let html = '';
+            videoFiles.forEach((item, index) => {
+                html += `
+                    <div 
+                        draggable="${!isRendering}" 
+                        ondragstart="handleDragStart(event, ${index})" 
+                        ondragover="handleDragOver(event, ${index})" 
+                        ondragend="handleDragEnd(event)"
+                        ondrop="handleDrop(event, ${index})"
+                        class="video-card-item flex items-center justify-between p-3 bg-slate-900/90 border border-slate-800 rounded-xl hover:border-slate-700 transition-all group cursor-grab active:cursor-grabbing hover:bg-slate-900"
+                        data-index="${index}"
+                    >
+                        <div class="flex items-center space-x-3 min-w-0">
+                            <!-- Drag Handle -->
+                            <div class="text-slate-600 group-hover:text-slate-400 cursor-grab flex items-center justify-center">
+                                <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                            </div>
+
+                            <!-- Thumbnail -->
+                            <div class="w-16 h-10 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 flex-shrink-0 relative group/thumb">
+                                <video src="${item.url}" class="w-full h-full object-cover"></video>
+                                <div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                                    <i data-lucide="play" class="w-3.5 h-3.5 text-white"></i>
+                                </div>
+                            </div>
+
+                            <!-- Meta -->
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">#${index + 1}</span>
+                                    <p class="text-xs font-bold text-white truncate max-w-[160px] sm:max-w-xs">${item.name}</p>
+                                </div>
+                                <div class="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                                    <span>${item.size}</span>
+                                    <span>&bull;</span>
+                                    <span class="text-indigo-400 font-medium">${item.durationText}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex items-center space-x-1 flex-shrink-0">
+                            <button onclick="moveVideo(${index}, -1)" ${index === 0 || isRendering ? 'disabled' : ''} class="p-1.5 text-slate-400 hover:text-white disabled:text-slate-800 hover:bg-slate-800 rounded-lg transition-colors" title="Pindah Atas">
+                                <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="moveVideo(${index}, 1)" ${index === videoFiles.length - 1 || isRendering ? 'disabled' : ''} class="p-1.5 text-slate-400 hover:text-white disabled:text-slate-800 hover:bg-slate-800 rounded-lg transition-colors" title="Pindah Bawah">
+                                <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="removeVideo('${item.id}')" ${isRendering ? 'disabled' : ''} class="p-1.5 text-rose-400 hover:text-rose-300 disabled:text-slate-800 hover:bg-rose-500/10 rounded-lg transition-colors ml-1" title="Hapus">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listContainer.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        // --- DRAG & DROP REORDERING HANDLERS ---
+        function handleDragStart(e, index) {
+            if (isRendering) return;
+            draggedItemIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            e.currentTarget.classList.add('opacity-40', 'border-indigo-500');
+        }
+
+        function handleDragOver(e, index) {
+            e.preventDefault();
+            if (isRendering || draggedItemIndex === null || draggedItemIndex === index) return;
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            if (isRendering || draggedItemIndex === null || draggedItemIndex === targetIndex) return;
+
+            const movedItem = videoFiles.splice(draggedItemIndex, 1)[0];
+            videoFiles.splice(targetIndex, 0, movedItem);
+
+            draggedItemIndex = null;
+            renderVideoList();
+        }
+
+        function handleDragEnd(e) {
+            draggedItemIndex = null;
+            renderVideoList();
+        }
+
+        function moveVideo(index, direction) {
+            if (isRendering) return;
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= videoFiles.length) return;
+            const temp = videoFiles[index];
+            videoFiles[index] = videoFiles[newIndex];
+            videoFiles[newIndex] = temp;
+            renderVideoList();
+        }
+
+        function removeVideo(id) {
+            if (isRendering) return;
+            videoFiles = videoFiles.filter(item => item.id !== id);
+            renderVideoList();
+        }
+
+        function clearAllVideos() {
+            if (isRendering) return;
+            videoFiles = [];
+            renderVideoList();
+        }
+
+        // --- DIRECT CANVAS & MEDIARECORDER MERGING ENGINE ---
+        async function startMerging() {
+            if (videoFiles.length === 0 || isRendering) return;
+
+            isRendering = true;
+            document.getElementById('startMergeBtn').disabled = true;
+            document.getElementById('renderProgressContainer').classList.remove('hidden');
+            document.getElementById('canvasPlaceholder').classList.add('hidden');
+
+            const canvas = document.getElementById('renderCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const targetW = currentAspect === '16:9' ? 1920 : 1080;
+            const targetH = currentAspect === '16:9' ? 1080 : 1920;
+            canvas.width = targetW;
+            canvas.height = targetH;
+
+            const strategy = document.querySelector('input[name="aspectStrategy"]:checked').value;
+            const videoElem = document.getElementById('hiddenVideoPlayer');
+
+            // Setup Audio Synthesizer & Canvas Stream Capture
+            const canvasStream = canvas.captureStream(30);
+            
+            // Audio context setup for video audio routing
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audioDestination = audioCtx.createMediaStreamDestination();
+            const sourceNode = audioCtx.createMediaElementSource(videoElem);
+            sourceNode.connect(audioDestination);
+            sourceNode.connect(audioCtx.destination); // For real-time listening if unmuted
+
+            // Combine audio track into captured canvas stream
+            const combinedStream = new MediaStream([
+                ...canvasStream.getVideoTracks(),
+                ...audioDestination.stream.getAudioTracks()
+            ]);
+
+            // Select MediaRecorder MIME type
+            let mimeType = 'video/webm;codecs=vp9,opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm';
+            }
+
+            const recorder = new MediaRecorder(combinedStream, { mimeType });
+            const recordedChunks = [];
+
+            recorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            recorder.start();
+
+            // Calculate total duration for progress
+            const totalDurationSec = videoFiles.reduce((acc, v) => acc + (v.durationSec || 0), 0);
+            let processedSec = 0;
+
+            // Sequential video rendering loop
+            for (let i = 0; i < videoFiles.length; i++) {
+                const item = videoFiles[i];
+                document.getElementById('renderStatusText').innerText = `Memproses Video #${i + 1}: ${item.name}`;
+
+                videoElem.src = item.url;
+                videoElem.muted = false;
+
+                await new Promise((resolve) => {
+                    videoElem.onloadedmetadata = () => resolve();
+                });
+
+                await audioCtx.resume();
+                await videoElem.play();
+
+                await new Promise((resolve) => {
+                    function renderFrame() {
+                        if (videoElem.ended || videoElem.paused) {
+                            resolve();
+                            return;
+                        }
+
+                        // Draw background & frame scaling strategy
+                        ctx.clearRect(0, 0, targetW, targetH);
+
+                        const vw = videoElem.videoWidth;
+                        const vh = videoElem.videoHeight;
+
+                        if (strategy === 'blur') {
+                            // Draw blurred background stretch
+                            ctx.save();
+                            ctx.filter = 'blur(30px) brightness(0.6)';
+                            ctx.drawImage(videoElem, 0, 0, targetW, targetH);
+                            ctx.restore();
+
+                            // Draw letterboxed original video over blurred background
+                            const scale = Math.min(targetW / vw, targetH / vh);
+                            const dw = vw * scale;
+                            const dh = vh * scale;
+                            const dx = (targetW - dw) / 2;
+                            const dy = (targetH - dh) / 2;
+                            ctx.drawImage(videoElem, dx, dy, dw, dh);
+
+                        } else if (strategy === 'pad_black') {
+                            ctx.fillStyle = '#000000';
+                            ctx.fillRect(0, 0, targetW, targetH);
+
+                            const scale = Math.min(targetW / vw, targetH / vh);
+                            const dw = vw * scale;
+                            const dh = vh * scale;
+                            const dx = (targetW - dw) / 2;
+                            const dy = (targetH - dh) / 2;
+                            ctx.drawImage(videoElem, dx, dy, dw, dh);
+
+                        } else if (strategy === 'crop') {
+                            const scale = Math.max(targetW / vw, targetH / vh);
+                            const dw = vw * scale;
+                            const dh = vh * scale;
+                            const dx = (targetW - dw) / 2;
+                            const dy = (targetH - dh) / 2;
+                            ctx.drawImage(videoElem, dx, dy, dw, dh);
+                        }
+
+                        // Update progress bar
+                        const currentVideoProgress = videoElem.currentTime;
+                        const totalProgress = Math.min(100, Math.round(((processedSec + currentVideoProgress) / (totalDurationSec || 1)) * 100));
+                        document.getElementById('renderPercent').innerText = `${totalProgress}%`;
+                        document.getElementById('renderProgressBar').style.width = `${totalProgress}%`;
+
+                        requestAnimationFrame(renderFrame);
+                    }
+
+                    renderFrame();
+                });
+
+                processedSec += item.durationSec || 0;
+            }
+
+            // Stop Recorder and save file
+            recorder.stop();
+            document.getElementById('renderStatusText').innerText = 'Menyelesaikan & Mengunduh File...';
+
+            recorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+                const downloadUrl = URL.createObjectURL(blob);
+                const userFilename = document.getElementById('outputFilename').value.trim() || 'gabungan_video.mp4';
+                const finalFilename = userFilename.endsWith('.mp4') || userFilename.endsWith('.webm') ? userFilename : `${userFilename}.mp4`;
+
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = finalFilename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(downloadUrl);
+
+                // Reset Engine State
+                isRendering = false;
+                document.getElementById('renderProgressContainer').classList.add('hidden');
+                document.getElementById('canvasPlaceholder').classList.remove('hidden');
+                renderVideoList();
+                showToast(`Video berhasil digabung & diunduh sebagai "${finalFilename}"`);
+            };
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').innerText = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
